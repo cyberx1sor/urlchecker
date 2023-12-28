@@ -1,0 +1,53 @@
+#!/bin/bash
+
+if [ "$#" -lt 3 ]; then
+    echo "Usage: $0 <input_file> -o <output_file>"
+    exit 1
+fi
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -o)
+            shift
+            output_file="$1"
+            ;;
+        *)
+            input_file="$1"
+            ;;
+    esac
+    shift
+done
+
+if [ -z "$input_file" ] || [ -z "$output_file" ]; then
+    echo "Usage: $0 <input_file> -o <output_file>"
+    exit 1
+fi
+
+sed 's/ .*$//' "$input_file" > cleaned_urls.txt
+
+get_status_and_color() {
+    url=$1
+    status=$(curl -o /dev/null -s -w "%{http_code}" -m 10 "$url")
+    
+    case $status in
+        200)
+            echo -e "\e[32m$url\e[0m - Status Code: $status (OK)"
+            echo "$url - $status" >> "$output_file"
+            ;;
+        301 | 302)
+            echo -e "\e[33m$url\e[0m - Status Code: $status (Redirect)"
+            echo "$url - $status" >> "$output_file"
+            ;;
+        *)
+            echo -e "\e[31m$url\e[0m - Status Code: $status (Error)"
+            ;;
+    esac
+}
+
+while IFS= read -r url; do
+    get_status_and_color "$url" &
+done < cleaned_urls.txt
+
+wait
+
+rm cleaned_urls.txt
